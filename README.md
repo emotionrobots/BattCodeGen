@@ -21,7 +21,7 @@ sudo apt-get update
 
 sudo apt-get install build-essential libsundials-dev
 
-pip install pybamm
+pip install pybamm==25.6
 
 ```
 
