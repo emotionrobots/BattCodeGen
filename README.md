@@ -2,7 +2,8 @@
 Battery Model C Code Generator
 
 ## Installation
-'''bash
+'''
+bash
 
 python3 -m venv myvenv 
 
@@ -16,7 +17,8 @@ cd BattCodeGen
 '''
 
 ## Install Prerequisits
-'''bash
+'''
+bash
 
 sudo apt-get update
 
