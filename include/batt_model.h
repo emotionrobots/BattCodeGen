@@ -163,7 +163,7 @@ int variables_work_bytes(casadi_int *sz_arg, casadi_int* sz_res, casadi_int *sz_
 #define variables_SZ_ARG 7
 #define variables_SZ_RES 2
 #define variables_SZ_IW 0
-#define variables_SZ_W 214
+#define variables_SZ_W 6240
 #ifdef __cplusplus
 } /* extern "C" */
 #endif

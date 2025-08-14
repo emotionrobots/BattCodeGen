@@ -68,5 +68,14 @@ disc.process_model(model)
 #       
 #-------------------------------------------------------------------------------------------
 opts = dict(main=False, with_header=True, indent=3, verbose=True) 
-var_names = ["Terminal voltage [V]"]
-model.generate("batt_model.c", var_names, input_parameter_order=None, cg_options=opts)
+#var_list = ["Terminal voltage [V]"]
+var_list = list(model.variables.keys()) 
+model.generate("batt_model.c", 
+               var_list, 
+               input_parameter_order=[], 
+               cg_options=opts,
+               write_names=True)
+
+
+
+

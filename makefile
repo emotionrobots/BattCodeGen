@@ -11,6 +11,7 @@ LIBS = -lm -lc -lsundials_ida -lsundials_nvecserial -lsundials_sunlinsolklu -lsu
 
 # Source files for binaries
 APP_SRCS = $(SRC_DIR)/main.c $(SRC_DIR)/batt_model.c 
+#APP_SRCS = $(SRC_DIR)/batt_model.c 
 
 # Binary targets
 BIN = $(BIN_DIR)/run_model

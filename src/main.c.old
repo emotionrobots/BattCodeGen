@@ -1,0 +1,96 @@
+/*!
+ *==========================================================================================================
+ * 
+ *  Main program for the battery model simulator
+ *
+ *==========================================================================================================
+ */
+#include <batt_model.h>
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+#include <batt_model.h>
+
+/*!
+ *---------------------------------------------------------------------------------------------------------
+ *
+ *  @fn 	int eval_rhs(double t, const double* x, const double* u, const double* p,
+ *                           double* xdot, casadi_int* iw, double* w)
+ *
+ *  @brief	Evaluate the RHS
+ *
+ *---------------------------------------------------------------------------------------------------------
+ */
+static int eval_rhs(
+    double t, const double* x, const double* u, const double* p,
+    double* xdot, casadi_int* iw, double* w)
+{
+    const casadi_real* arg[8];
+    casadi_real* res[8];
+    int k=0;
+    arg[k++] = &t;
+    arg[k++] = x;
+    if (u) arg[k++] = u;
+    if (p) arg[k++] = p;
+    res[0] = xdot;
+    return rhs_(arg, res, iw, w, NULL);
+}
+
+
+/*!
+ *---------------------------------------------------------------------------------------------------------
+ *---------------------------------------------------------------------------------------------------------
+ */
+casadi_int len_from_sparsity(const casadi_int* sp) 
+{
+    // CasADi CSC: sp[0]=nrow, sp[1]=ncol, then column pointers of length ncol+1, then row indices
+    casadi_int nrow = sp[0], ncol = sp[1];
+    // vectors are typically ncol=1, so length = nrow
+    return nrow * ncol;
+}
+
+
+
+/*!
+ *---------------------------------------------------------------------------------------------------------
+ *  main
+ *---------------------------------------------------------------------------------------------------------
+ */
+int main(void) 
+{
+    const casadi_real *arg = NULL; 
+    casadi_real *res = NULL;
+    casadi_int sz_arg = 0, sz_res = 0, sz_iw = 0, sz_w = 0; 
+
+
+    // Allocate rhs_ data 
+    rhs__work(&sz_arg, &sz_res, &sz_iw, &sz_w);
+    
+    if (sz_arg > 0)
+       arg = (casadi_real *) malloc(sz_arg * sizeof(casadi_real)); 
+
+    if (sz_res > 0)
+       res = (casadi_real *) malloc(sz_res * sizeof(casadi_real)); 
+ 
+    printf("sz_arg=%lld, sz_res=%lld, sz_iw=%lld, sz_w=%lld\n", sz_arg, sz_res, sz_iw, sz_w);
+    printf("rhs__n_in()=%lld, rhs__n_out()=%lld\n", rhs__n_in(), rhs__n_out());
+    printf("alg__n_in()=%lld, alg__n_out()=%lld\n", alg__n_in(), alg__n_out());
+
+    const casadi_int *x0_in = x0_sparsity_in(0);
+    const casadi_int *x0_out = x0_sparsity_out(0);
+    const casadi_int *z0_in = z0_sparsity_in(0);
+    const casadi_int *z0_out = z0_sparsity_out(0);
+    const casadi_int *var_in = variables_sparsity_in(0);
+    const casadi_int *var_out = variables_sparsity_out(0);
+
+    printf("len_from_sparsity(x0_in) = %lld\n", len_from_sparsity(x0_in));
+    printf("len_from_sparsity(x0_out) = %lld\n", len_from_sparsity(x0_out));
+    printf("len_from_sparsity(z0_in) = %lld\n", len_from_sparsity(z0_in));
+    printf("len_from_sparsity(z0_out) = %lld\n", len_from_sparsity(z0_out));
+    printf("len_from_sparsity(var_in) = %lld\n", len_from_sparsity(var_in));
+    printf("len_from_sparsity(var_out) = %lld\n", len_from_sparsity(var_out));
+
+    return 0;
+}
