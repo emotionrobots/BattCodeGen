@@ -37,7 +37,7 @@ int rhs__work_bytes(casadi_int *sz_arg, casadi_int* sz_res, casadi_int *sz_iw, c
 #define rhs__SZ_ARG 7
 #define rhs__SZ_RES 2
 #define rhs__SZ_IW 0
-#define rhs__SZ_W 5168
+#define rhs__SZ_W 8230
 int alg_(const casadi_real** arg, casadi_real** res, casadi_int* iw, casadi_real* w, int mem);
 int alg__alloc_mem(void);
 int alg__init_mem(int mem);
@@ -58,7 +58,7 @@ int alg__work_bytes(casadi_int *sz_arg, casadi_int* sz_res, casadi_int *sz_iw, c
 #define alg__SZ_ARG 7
 #define alg__SZ_RES 2
 #define alg__SZ_IW 0
-#define alg__SZ_W 3521
+#define alg__SZ_W 3950
 int jac_rhs(const casadi_real** arg, casadi_real** res, casadi_int* iw, casadi_real* w, int mem);
 int jac_rhs_alloc_mem(void);
 int jac_rhs_init_mem(int mem);
@@ -76,10 +76,10 @@ const casadi_int* jac_rhs_sparsity_in(casadi_int i);
 const casadi_int* jac_rhs_sparsity_out(casadi_int i);
 int jac_rhs_work(casadi_int *sz_arg, casadi_int* sz_res, casadi_int *sz_iw, casadi_int *sz_w);
 int jac_rhs_work_bytes(casadi_int *sz_arg, casadi_int* sz_res, casadi_int *sz_iw, casadi_int *sz_w);
-#define jac_rhs_SZ_ARG 9
+#define jac_rhs_SZ_ARG 17
 #define jac_rhs_SZ_RES 3
-#define jac_rhs_SZ_IW 843
-#define jac_rhs_SZ_W 20429
+#define jac_rhs_SZ_IW 996
+#define jac_rhs_SZ_W 36532
 int jac_alg(const casadi_real** arg, casadi_real** res, casadi_int* iw, casadi_real* w, int mem);
 int jac_alg_alloc_mem(void);
 int jac_alg_init_mem(int mem);
@@ -97,10 +97,10 @@ const casadi_int* jac_alg_sparsity_in(casadi_int i);
 const casadi_int* jac_alg_sparsity_out(casadi_int i);
 int jac_alg_work(casadi_int *sz_arg, casadi_int* sz_res, casadi_int *sz_iw, casadi_int *sz_w);
 int jac_alg_work_bytes(casadi_int *sz_arg, casadi_int* sz_res, casadi_int *sz_iw, casadi_int *sz_w);
-#define jac_alg_SZ_ARG 7
+#define jac_alg_SZ_ARG 9
 #define jac_alg_SZ_RES 3
-#define jac_alg_SZ_IW 843
-#define jac_alg_SZ_W 12112
+#define jac_alg_SZ_IW 996
+#define jac_alg_SZ_W 17537
 int x0(const casadi_real** arg, casadi_real** res, casadi_int* iw, casadi_real* w, int mem);
 int x0_alloc_mem(void);
 int x0_init_mem(int mem);
@@ -121,7 +121,7 @@ int x0_work_bytes(casadi_int *sz_arg, casadi_int* sz_res, casadi_int *sz_iw, cas
 #define x0_SZ_ARG 2
 #define x0_SZ_RES 2
 #define x0_SZ_IW 0
-#define x0_SZ_W 1534
+#define x0_SZ_W 1780
 int z0(const casadi_real** arg, casadi_real** res, casadi_int* iw, casadi_real* w, int mem);
 int z0_alloc_mem(void);
 int z0_init_mem(int mem);
@@ -142,7 +142,7 @@ int z0_work_bytes(casadi_int *sz_arg, casadi_int* sz_res, casadi_int *sz_iw, cas
 #define z0_SZ_ARG 2
 #define z0_SZ_RES 2
 #define z0_SZ_IW 0
-#define z0_SZ_W 992
+#define z0_SZ_W 1205
 int variables(const casadi_real** arg, casadi_real** res, casadi_int* iw, casadi_real* w, int mem);
 int variables_alloc_mem(void);
 int variables_init_mem(int mem);
@@ -163,7 +163,7 @@ int variables_work_bytes(casadi_int *sz_arg, casadi_int* sz_res, casadi_int *sz_
 #define variables_SZ_ARG 7
 #define variables_SZ_RES 2
 #define variables_SZ_IW 0
-#define variables_SZ_W 6240
+#define variables_SZ_W 1900
 #ifdef __cplusplus
 } /* extern "C" */
 #endif

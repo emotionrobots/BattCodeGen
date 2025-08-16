@@ -4,14 +4,15 @@ SRC_DIR = src
 
 CC = gcc
 AR = ar rcs
-CFLAGS = -Wall -Wno-unused-parameter -Wno-sign-compare -Wextra -O3 -DNDEBUG -fPIC -I. -I$(INC_DIR)
+CFLAGS = -Wall -Wno-unused-parameter -Wno-sign-compare -Wextra -O3 -std=c11 -DNDEBUG -fPIC -I. -I$(INC_DIR)
 LDFLAGS = 
-LIBS = -lm -lc -lsundials_ida -lsundials_nvecserial -lsundials_sunlinsolklu -lsundials_sunmatrixsparse 
+LIBS = -lm -lc 
+#LIBS = -lm -lc -lsundials_ida -lsundials_nvecserial -lsundials_sunlinsolklu -lsundials_sunmatrixsparse 
 
 
 # Source files for binaries
 APP_SRCS = $(SRC_DIR)/main.c $(SRC_DIR)/batt_model.c 
-#APP_SRCS = $(SRC_DIR)/batt_model.c 
+
 
 # Binary targets
 BIN = $(BIN_DIR)/run_model
@@ -35,4 +36,5 @@ $(BIN): $(APP_SRCS)
 # Clean target
 clean:
 	rm -f $(BIN)
+	rm -f dfn_gittr.csv 
 
