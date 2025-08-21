@@ -1,0 +1,423 @@
+// cgen/runner.c : run DFN at 10 ms steps with GITT 1A pulses; stop at 3.0 V.
+// Build with Makefile below. Assumes code generated into batt_model.c
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+#include "batt_model.h"         // generated header (because with_header=true)
+
+#ifndef CASADI_REAL
+#define CASADI_REAL double
+#endif
+
+#ifndef CASADI_INT
+#define CASADI_INT  long long int
+#endif
+
+
+// Finite-difference step for numerical Jacobians
+static const CASADI_REAL EPSJ = 1e-8;
+
+/*!
+ *--------------------------------------------------------------------------------------------------------
+ *  Helper: dense linear solve (Gaussian elimination, no pivoting – ok for small systems)
+ *--------------------------------------------------------------------------------------------------------
+ */
+static int solve_linear(int n, CASADI_REAL *A, CASADI_REAL *b) 
+{
+    for (int k = 0; k < n; ++k) {
+        CASADI_REAL piv = A[k*n + k];
+        if (fabs(piv) < 1e-14) return 1; // singular
+        CASADI_REAL inv = 1.0 / piv;
+        for (int j = k; j < n; ++j) A[k*n + j] *= inv;
+        b[k] *= inv;
+        for (int i = 0; i < n; ++i) if (i != k) {
+            CASADI_REAL f = A[i*n + k];
+            for (int j = k; j < n; ++j) A[i*n + j] -= f * A[k*n + j];
+            b[i] -= f * b[k];
+        }
+    }
+    return 0;
+}
+
+
+/*!
+ *--------------------------------------------------------------------------------------------------------
+ *  Evaluate rhs f(x,z,t,u) and alg g(x,z,t,u) using generated code
+ *--------------------------------------------------------------------------------------------------------
+ */
+static void eval_rhs_alg(const CASADI_REAL *x, const CASADI_REAL *z,
+                         CASADI_REAL t, CASADI_REAL I, CASADI_REAL Tamb,
+                         CASADI_REAL *f_out, CASADI_REAL *g_out)
+{
+    const CASADI_REAL *arg[5];
+    CASADI_REAL *res_f[1]; CASADI_REAL *res_g[1];
+    CASADI_REAL *w; 
+    CASADI_INT *iw;
+    CASADI_INT sz_arg=0, sz_res=0, sz_iw=0, sz_w=0;
+    CASADI_INT mem;
+
+    CASADI_REAL u[2] = { I, Tamb };
+
+    arg[0] = x;
+    arg[1] = z;
+    arg[2] = &t;
+    arg[3] = u;   // order must match input_parameter_order in Python
+    arg[4] = NULL; // (if codegen includes parameters vector, leave NULL here)
+    res_f[0] = f_out;
+
+    mem = rhs__alloc_mem();
+    rhs__work(&sz_arg, &sz_res, &sz_iw, &sz_w);
+    iw = sz_iw ? (CASADI_INT *) malloc(sz_iw * sizeof(CASADI_INT)) : NULL;
+    w = sz_w ? (CASADI_REAL *) malloc(sz_w * sizeof(CASADI_REAL)) : NULL;
+
+    //rhs_(arg, res_f, NULL, NULL, 0);
+    rhs_(arg, res_f, iw, w, mem);
+    res_g[0] = g_out;
+
+    mem = alg__alloc_mem();
+    sz_arg=0, sz_res=0, sz_iw=0, sz_w=0;
+    alg__work(&sz_arg, &sz_res, &sz_iw, &sz_w);
+    iw = sz_iw ? (CASADI_INT *) malloc(sz_iw * sizeof(CASADI_INT)) : NULL;
+    w = sz_w ? (CASADI_REAL *) malloc(sz_w * sizeof(CASADI_REAL)) : NULL;
+    // alg_(arg, res_g, NULL, NULL, 0);
+    alg_(arg, res_g, iw, w, mem);
+}
+
+/*!
+ *--------------------------------------------------------------------------------------------------------
+ *  Newton solve for implicit Euler step:
+ *  F([x+,z+]) = [ x+ - x - dt * f(x+,z+) ; g(x+,z+) ] = 0
+ *--------------------------------------------------------------------------------------------------------
+ */
+static int step_implicit_euler(CASADI_REAL *x, CASADI_REAL *z, int nx, int nz,
+                               CASADI_REAL tnext, CASADI_REAL dt, CASADI_REAL I, CASADI_REAL Tamb)
+{
+    const int n = nx + nz;
+    CASADI_REAL *F  = (CASADI_REAL*)calloc(n, sizeof(CASADI_REAL));
+    CASADI_REAL *J  = (CASADI_REAL*)calloc(n*n, sizeof(CASADI_REAL));
+    CASADI_REAL *dY = (CASADI_REAL*)calloc(n, sizeof(CASADI_REAL));
+    CASADI_REAL *xk = (CASADI_REAL*)malloc(nx*sizeof(CASADI_REAL));
+    CASADI_REAL *zk = (CASADI_REAL*)malloc(nz*sizeof(CASADI_REAL));
+    CASADI_REAL *fx = (CASADI_REAL*)malloc(nx*sizeof(CASADI_REAL));
+    CASADI_REAL *gx = (CASADI_REAL*)malloc(nz*sizeof(CASADI_REAL));
+    CASADI_REAL *fx2= (CASADI_REAL*)malloc(nx*sizeof(CASADI_REAL));
+    CASADI_REAL *gx2= (CASADI_REAL*)malloc(nz*sizeof(CASADI_REAL));
+
+    printf("Step 21\n");
+
+#if 0
+    memcpy(xk, x, nx*sizeof(CASADI_REAL));
+    memcpy(zk, z, nz*sizeof(CASADI_REAL));
+
+    int iter, maxit=20;
+    for (iter=0; iter<maxit; ++iter) {
+        // F(y) with y=[xk, zk]
+        eval_rhs_alg(xk, zk, tnext, I, Tamb, fx, gx);
+        for (int i=0;i<nx;++i) F[i]     = xk[i] - x[i] - dt*fx[i];
+        for (int j=0;j<nz;++j) F[nx+j]  = gx[j];
+    
+	printf("Step 22\n");
+
+        // Check convergence
+        CASADI_REAL nrm=0;
+        for (int i=0;i<n;++i) nrm = fmax(nrm, fabs(F[i]));
+        if (nrm < 1e-8) { break; }
+
+        // Numerical Jacobian (dense): columns for [x; z]
+        // Perturb x
+        for (int c=0;c<nx;++c) {
+            CASADI_REAL tmp = xk[c];
+            xk[c] = tmp + EPSJ;
+            eval_rhs_alg(xk, zk, tnext, I, Tamb, fx2, gx2);
+            xk[c] = tmp;
+
+            for (int r=0;r<nx;++r) J[r*n + c]      = ((xk[r] - x[r] - dt*fx2[r]) - F[r]) / EPSJ;
+            for (int r=0;r<nz;++r) J[(nx+r)*n + c] = (gx2[r] - gx[r]) / EPSJ;
+        }
+        // Perturb z
+        for (int c=0;c<nz;++c) {
+            CASADI_REAL tmp = zk[c];
+            zk[c] = tmp + EPSJ;
+            eval_rhs_alg(xk, zk, tnext, I, Tamb, fx2, gx2);
+            zk[c] = tmp;
+
+            for (int r=0;r<nx;++r) J[r*n + (nx+c)]      = ((xk[r] - x[r] - dt*fx2[r]) - F[r]) / EPSJ;
+            for (int r=0;r<nz;++r) J[(nx+r)*n + (nx+c)] = (gx2[r] - gx[r]) / EPSJ;
+        }
+
+	printf("Step 23\n");
+
+        // Solve J * dY = -F
+        for (int i=0;i<n;++i) dY[i] = -F[i];
+        if (solve_linear(n, J, dY)) { iter = -1; break; }
+
+	printf("Step 24\n");
+        // Update
+        for (int i=0;i<nx;++i) xk[i] += dY[i];
+        for (int j=0;j<nz;++j) zk[j] += dY[nx+j];
+    }
+
+    int ok = (iter>=0 && iter<maxit);
+    if (ok) { memcpy(x, xk, nx*sizeof(CASADI_REAL)); memcpy(z, zk, nz*sizeof(CASADI_REAL)); }
+    printf("Step 25\n");
+#endif
+    if (F) free (F);
+    printf("Step 26\n");
+    if (J) free(J); 
+    printf("Step 27\n");
+    if (dY) free(dY); 
+    printf("Step 28\n");
+    if (xk) free(xk); 
+    printf("Step 29\n");
+    if (zk) free(zk); 
+    printf("Step 30\n");
+    if (fx) free(fx); 
+    printf("Step 31\n");
+    if (gx) free(gx); 
+    printf("Step 32\n");
+    if (fx2) free(fx2); 
+    printf("Step 33\n");
+    if (gx2) free(gx2);
+    printf("Step 34\n");
+
+    //return ok ? 0 : 1;
+    return 0;
+}
+
+
+/*!
+ *--------------------------------------------------------------------------------------------------------
+ *  Evaluate exported variables[] (Voltage, Current, capacity, temps, LLI/LAM…)
+ *--------------------------------------------------------------------------------------------------------
+ */
+static void eval_vars(const CASADI_REAL *x, const CASADI_REAL *z,
+                      CASADI_REAL t, CASADI_REAL I, CASADI_REAL Tamb,
+                      CASADI_REAL *vars_out /* length = variables_n_out( ) */)
+{
+    const CASADI_REAL *arg[5] = {0};
+    CASADI_REAL *res[1] = {0};
+    CASADI_REAL u[2] = { I, Tamb };
+    CASADI_INT sz_arg=0, sz_res=0, sz_iw=0, sz_w=0;
+    CASADI_INT mem = 0;
+
+    mem = variables_alloc_mem();
+    variables_work(&sz_arg, &sz_res, &sz_iw, &sz_w);
+
+    CASADI_INT *iw = sz_iw ? malloc(sz_iw * sizeof(CASADI_INT)) : NULL;
+    CASADI_REAL *w = sz_w ? malloc(sz_w * sizeof(CASADI_REAL)) : NULL;
+
+    arg[0] = x; arg[1] = z; arg[2] = &t; arg[3] = u; arg[4] = NULL;
+    res[0] = vars_out;
+    // variables(arg, res, iw, w, 0);
+    variables(arg, res, iw, w, mem);
+}
+
+
+/*!
+ *--------------------------------------------------------------------------------------------------------
+ *  GITT current profile
+ *--------------------------------------------------------------------------------------------------------
+ */
+static CASADI_REAL gitt_current(double t) 
+{
+    // Simple GITT: 10 min pulse @ +1 A, then 50 min rest @ 0 A; repeat.
+    const double period = 3600.0;     // 60 min
+    const double tpulse = 600.0;      // 10 min
+    double m = fmod(t, period);
+    return (m < tpulse) ? 1.0 : 0.0;
+}
+
+
+/*!
+ *--------------------------------------------------------------------------------------------------------
+ *  Main program
+ *--------------------------------------------------------------------------------------------------------
+ */
+int main(void) 
+{
+    int rc = 0;
+    const CASADI_REAL dt = 0.01;       // 10 ms
+    CASADI_REAL t = 0.0;
+    CASADI_REAL Tamb = 298.15;         // allow changing per step
+    CASADI_REAL I = gitt_current(t);
+    // CASADI_REAL u[2] = { I, Tamb };
+    const CASADI_REAL **arg = NULL; 
+    CASADI_REAL *res[1] = {0};
+    CASADI_REAL *w = NULL;
+    CASADI_INT *iw = NULL;
+    CASADI_INT sz_arg=0, sz_res=0, sz_iw=0, sz_w=0, mem=0;
+
+
+    //----------------------------------------------------------------------------------
+    // Query problem sizes from generated API:
+    CASADI_INT nx = x0_n_out();   // length of x state
+    CASADI_REAL *x = (CASADI_REAL*)malloc(nx * sizeof(CASADI_REAL));
+    if (!x) 
+    {
+       perror("malloc x");
+       return 1;
+    }
+    printf("nx = %lld\n", nx);
+
+    // Initial conditions from generated code
+    x0_work(&sz_arg, &sz_res, &sz_iw, &sz_w);
+    iw = sz_iw ? (CASADI_INT *) malloc(sz_iw * sizeof(CASADI_INT)) : NULL;
+    w = sz_w ? (CASADI_REAL *) malloc(sz_w * sizeof(CASADI_REAL)) : NULL;
+
+    res[0] = x;
+    arg = NULL;
+    mem = x0_alloc_mem();
+    if (mem < 0) 
+    {
+       perror("x0_alloc_mem() failed");
+       return 1;
+    }
+
+    // X0 initialization 
+    rc = x0(arg, res, iw, w, mem);
+    if (rc) 
+    {
+       perror("x0()");
+       x0_free_mem(mem);
+       free(iw);
+       free(w);
+       free(x);
+       return 1;
+    }
+    printf("x0[0] = %.9g\n", (CASADI_REAL)x[0]);
+    if (nx > 1) printf("x0[1] = %.9g\n", (CASADI_REAL)x[1]);
+
+
+    printf("Step 1\n");
+
+    //----------------------------------------------------------------------------------
+    // Query problem sizes from generated API:
+    CASADI_INT nz = z0_n_out();   // length of z state
+    CASADI_REAL *z = (CASADI_REAL*)malloc(nz * sizeof(CASADI_REAL));
+    if (!z) 
+    {
+       perror("malloc z");
+       return 1;
+    }
+    printf("nz = %lld\n", nz);
+
+    // Initial conditions from generated code
+    z0_work(&sz_arg, &sz_res, &sz_iw, &sz_w);
+    iw = sz_iw ? (CASADI_INT *) malloc(sz_iw * sizeof(CASADI_INT)) : NULL;
+    w = sz_w ? (CASADI_REAL *) malloc(sz_w * sizeof(CASADI_REAL)) : NULL;
+
+    res[0] = z;
+    arg = NULL;
+    mem = z0_alloc_mem();
+    if (mem < 0) 
+    {
+       perror("x0_alloc_mem() failed");
+       return 1;
+    }
+
+    // Z0 initialization 
+    rc = z0(arg, res, iw, w, 0);
+    if (rc)
+    {
+       perror("z0()");
+       z0_free_mem(mem);
+       free(iw);
+       free(w);
+       free(z);
+       return 1;
+    }
+    printf("z0[0] = %.9g\n", (CASADI_REAL)z[0]);
+    if (nz > 1) printf("z0[1] = %.9g\n", (CASADI_REAL)z[1]);
+
+    printf("Step 3\n");
+
+
+    // Time loop
+    CASADI_INT varN = variables_n_out();
+    CASADI_REAL *vars = (CASADI_REAL*)malloc(varN*sizeof(CASADI_REAL));
+    printf("varN = %lld\n", varN);
+
+    // CSV header
+    printf("time_s,current_A,SOC,SOH,voltage_V,anode_V,cathode_V,LAM_neg_pct,LAM_pos_pct,LLI_pct\n");
+
+    // Helper accumulators
+    CASADI_REAL nominal_Ah = 0.0;
+
+
+#if 1
+    // We’ll read Nominal cell capacity [A.h] from first variables eval below
+    // Run until voltage < 3.0 V
+    for (int step = 0; step < 100000000; ++step) 
+    {
+        I = gitt_current(t);
+
+        printf("Step 4\n");
+
+        // Integrate to t+dt (implicit Euler)
+        if (step > 0) // at t=0 we print initial values first
+        {    
+            if (step_implicit_euler(x, z, nx, nz, t + dt, dt, I, Tamb)) 
+	    {
+                fprintf(stderr, "Newton failed at t=%.6f s\n", t);
+                break;
+            }
+        }
+
+        printf("Step 5\n");
+
+        // Evaluate variables
+        eval_vars(x, z, t, I, Tamb, vars);
+
+
+        printf("Step 6\n");
+        // The export_vars[] order from Python:
+        // 0: Voltage [V]
+        // 1: Current [A]
+        // 2: Discharge capacity [A.h]
+        // 3: Nominal cell capacity [A.h]
+        // 4: X-averaged cell temperature [K]
+        // 5: Anode potential [V]
+        // 6: Cathode potential [V]
+        // 7: Loss of lithium inventory [%]
+        // 8: Loss of active material in negative electrode [%]
+        // 9: Loss of active material in positive electrode [%]
+
+        CASADI_REAL V      = vars[0];
+        CASADI_REAL Imeas  = vars[1];
+        CASADI_REAL QdisAh = vars[2];
+        nominal_Ah         = (step==0 ? vars[3] : nominal_Ah);
+        CASADI_REAL Va     = vars[5];
+        CASADI_REAL Vc     = vars[6];
+        CASADI_REAL LLIpct = vars[7];
+        CASADI_REAL LAMneg = vars[8];
+        CASADI_REAL LAMpos = vars[9];
+
+        printf("Step 7\n");
+
+        // SOC and a simple SOH proxy:
+        // SOC = 1 - Q_dis / Nominal
+        CASADI_REAL SOC = (nominal_Ah > 0) ? fmax(0.0, 1.0 - (CASADI_REAL)(QdisAh / nominal_Ah)) : NAN;
+        // SOH (capacity based) ≈ 1 - max(LAMneg, LAMpos)/100  (simple, illustrative)
+        CASADI_REAL SOH = 1.0 - (CASADI_REAL)(fmax(LAMneg, LAMpos) / 100.0);
+
+        printf("%.3f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f\n",
+               t, I, SOC, SOH, V, Va, Vc, LAMneg, LAMpos, LLIpct);
+
+        printf("Step 8\n");
+
+        if (V < 3.0) break;  // stop condition per prompt
+
+        t += dt;
+        printf("Step 9\n");
+    }
+#endif
+
+    free(x); 
+    free(z); 
+    free(vars);
+
+    return 0;
+}
+
