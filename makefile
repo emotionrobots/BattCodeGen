@@ -1,58 +1,25 @@
-BIN_DIR = bin
-INC_DIR = include 
-SRC_DIR = src
-LIB_DIR = lib
+# Build with numeric Jacobians (default): `make`
+# To use CasADi Jacobians from PyBaMM codegen (if present): `make USE_CASADI_JAC=1`
+
 
 CC = gcc
-AR = ar
-CFLAGS = -Wall -Wno-unused-parameter -Wno-sign-compare -Wextra -O3 -std=c11 -DNDEBUG -fPIC -I. -I$(INC_DIR)
-LDFLAGS = 
-LIBS = -lm -lc 
+CFLAGS = -O3 -std=c11 -Wall -Wextra -pedantic 
+LDFLAGS = -lm -lc
+SRC_SIM = simulate.c integrator.c linalg.c batt_model.c
+OBJ_SIM = $(SRC_SIM:.c=.o)
 
 
-# Source files for binaries
-APP_SRCS = $(SRC_DIR)/main.c 
+.PHONY: all clean run test
+all: simulate
 
 
-# Source files for library
-LIB_SRCS = $(SRC_DIR)/batt_model.c 
+simulate: $(OBJ_SIM)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 
-# Binary targets
-BIN = $(BIN_DIR)/run_model
+run: simulate
+	./simulate | tee output.csv
 
 
-# Library file
-LIB = $(LIB_DIR)/libbatt_model.a
-
-
-# Object target
-OBJ = $(LIB_SRCS:.c=.o)
-
-
-# All targets
-.PHONY: all clean
-all: $(BIN) $(LIB)
-
-
-# Build library
-$(LIB): $(OBJ)
-	$(AR) rcs $@ $^
-
-
-# Build binary
-$(BIN): $(APP_SRCS) $(LIB)
-	$(CC) $(CFLAGS) -o $(BIN) $(APP_SRCS) $(LIB) $(LIBS) 
-
-
-# Compile source files to object files
-%.o: %.c
-	$(CC) $(CFLAGS) -c $< -o $@
-
-
-# Clean target
 clean:
-	rm -f $(BIN) $(LIB) $(SRC_DIR)/*.o
-	rm -f $(BIN) $(LIB)
-	rm -f dfn_gittr.csv 
-
+	rm -f *.o simulate output.csv
