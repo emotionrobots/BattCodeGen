@@ -3,7 +3,7 @@
 
 
 CC = gcc
-CFLAGS = -O3 -std=c11 -Wall -Wextra -pedantic 
+CFLAGS = -O3 -std=c11 -ffast-math -Wall -Wextra -pedantic 
 LDFLAGS = -lm -lc
 SRC_SIM = simulate.c integrator.c linalg.c batt_model.c
 OBJ_SIM = $(SRC_SIM:.c=.o)

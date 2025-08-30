@@ -79,7 +79,8 @@ params.process_model(model)
 #  Setup the spatial variable to define Mesh for discretisation
 #-------------------------------------------------------------------------------------------
 var = pybamm.standard_spatial_vars
-var_pts = {var.x_n: 30, var.x_s: 30, var.x_p: 30, var.r_n: 10, var.r_p: 10}
+# var_pts = {var.x_n: 30, var.x_s: 30, var.x_p: 30, var.r_n: 10, var.r_p: 10}
+var_pts = {var.x_n: 5, var.x_s: 5, var.x_p: 5, var.r_n: 3, var.r_p: 3}
 mesh = pybamm.Mesh(geometry, model.default_submesh_types, var_pts)
 
 disc = pybamm.Discretisation(mesh, model.default_spatial_methods)

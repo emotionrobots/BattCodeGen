@@ -81,7 +81,7 @@ static
 double current_profile_GITT(double t)
 {
    double phase = fmod(t, 100.0);
-   return (phase < 10.0) ? 1.0 : 0.0; // discharge positive out of cell
+   return (phase < 50.0) ? 2.0 : 0.0; // discharge positive out of cell
 }
 
 
@@ -417,8 +417,9 @@ int main(void)
 {
    int rc;
    double t = 0;
-   const double dt = 0.001; 		// seconds
-   const double t_end_cap = 1000.0; 	// safety cap for demo
+   // const double dt = 0.001; 		// seconds
+   const double dt = 0.01; 		// seconds
+   const double t_end_cap = 3000.0; 	// safety cap for demo
    const double Tamb_K = 298.15; 	// 25 C
 
    // Init the CTX
@@ -489,7 +490,7 @@ int main(void)
       double SOH = (Q_total_init>0)? (Qtot / Q_total_init) : 1.0;
 
       // Emit CSV row
-      printf("%.2f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f\n",
+      printf("%.3f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f\n",
               t,
               ctx.vars[IDX_CURRENT], 
 	      SOC, 
@@ -505,7 +506,6 @@ int main(void)
 
       // Terminate if voltage below 3.0 V
       if (ctx.vars[IDX_VOLTAGE] < 3.0) break;
-      if (t >= 1000.0) break; // also stop at 1000 s as requested
    }
 
    ctx_free(&ctx);
