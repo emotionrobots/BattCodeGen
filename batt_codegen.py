@@ -16,18 +16,19 @@ from numpy import testing
 
 
 #-------------------------------------------------------------------------------------------
-#  Create DFN model with required configurations 
+#
+#  Create DFN model with required configurations
+#
+#  For full list of options see: https://tinyurl.com/modelopts
+#
 #-------------------------------------------------------------------------------------------
-model = pybamm.lithium_ion.DFN(options={
-            "thermal": "lumped",                         # lumped thermal ODE
-            "SEI": "ec reaction limited",                # SEI -> contributes to LLI
-            "loss of active material": "reaction-driven",  # LAM mechanism
-            #"loss of active material": "stress-driven",  # LAM mechanism
-            # (You can switch to "reaction-driven" or tuple per electrode if desired)
-        })
-'''
-model = pybamm.lithium_ion.DFN()
-'''
+opts={
+   "thermal": "lumped", 
+   "SEI": "ec reaction limited", 
+   "loss of active material": "reaction-driven" 
+}
+model = pybamm.lithium_ion.DFN(options=opts)
+
 
 #-------------------------------------------------------------------------------------------
 # Add explicit anode/cathode potentials as variables (convenient for codegen)
